@@ -351,8 +351,10 @@ public:
 	[[nodiscard]] bool improveLinkPreviews() const { return _improveLinkPreviews.current(); }
 	[[nodiscard]] bool crashReporting() const { return _crashReporting.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
-	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] bool skipSilence() const { return _skipSilence.current(); }
+	[[nodiscard]] rpl::producer<bool> skipSilenceValue() const { return _skipSilence.value(); }
+	[[nodiscard]] rpl::producer<bool> skipSilenceChanges() const { return _skipSilence.changes(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -440,6 +442,7 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setSkipSilence(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -711,6 +714,7 @@ private:
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<bool> _skipSilence = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

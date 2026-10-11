@@ -214,6 +214,11 @@ private:
 
 	int _locks = 0;
 
+	void handleSilenceStateChanged(bool isSilent);
+	void applyEffectiveSpeed();
+	float64 _userSpeed = 1.;
+	bool _silenceActive = false;
+
 	rpl::lifetime _lifetime;
 	rpl::lifetime _sessionLifetime;
 

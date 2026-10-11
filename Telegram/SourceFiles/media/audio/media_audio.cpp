@@ -240,11 +240,20 @@ constexpr auto kCheckPlaybackPositionDelta = 2400LL; // update position called e
 constexpr auto kCheckFadingTimeout = crl::time(7); // 7ms
 
 rpl::event_stream<AudioMsgId> UpdatedStream;
+rpl::event_stream<SilenceUpdate> SilenceChangedStream;
 
 } // namespace
 
 rpl::producer<AudioMsgId> Updated() {
 	return UpdatedStream.events();
+}
+
+rpl::producer<SilenceUpdate> SilenceChanged() {
+	return SilenceChangedStream.events();
+}
+
+void NotifySilenceChanged(const AudioMsgId &audioId, bool isSilent) {
+	SilenceChangedStream.fire({ audioId, isSilent });
 }
 
 // Thread: Any. Must be locked: AudioMutex.
@@ -439,7 +448,7 @@ void Mixer::Track::updateWithSpeedPosition() {
 int64 Mixer::Track::SpeedIndependentPosition(
 		int64 position,
 		float64 speed) {
-	Expects(speed <= kSpeedMax);
+	Expects(speed <= kSilenceSpeedMax);
 
 	return int64(base::SafeRound(position * speed));
 }

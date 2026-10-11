@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_location.h"
 #include "ffmpeg/ffmpeg_utility.h"
 #include "media/media_common.h"
+#include "ayu/ayu_settings.h"
 
 extern "C" {
 #include <libavfilter/buffersink.h>
@@ -232,6 +233,21 @@ int64 AbstractAudioFFMpegLoader::startReadingQueuedFrames(float64 newSpeed) {
 	return _framesQueued.front().position;
 }
 
+void AbstractAudioFFMpegLoader::setSilenceSkipEnabled(bool enabled) {
+	_silenceSkipEnabled = enabled;
+	if (!enabled) {
+		_silenceDetector.reset();
+	}
+}
+
+bool AbstractAudioFFMpegLoader::isSilenceSkipActive() const {
+	return _silenceDetector.isSilent();
+}
+
+void AbstractAudioFFMpegLoader::setSilenceCallback(Fn<void(bool isSilent)> callback) {
+	_silenceCallback = std::move(callback);
+}
+
 bool AbstractAudioFFMpegLoader::initUsingContext(
 		not_null<AVCodecContext*> context,
 		float64 speed) {
@@ -277,6 +293,14 @@ bool AbstractAudioFFMpegLoader::initUsingContext(
 	}
 
 	createSpeedFilter(speed);
+
+	_silenceDetector.setSampleFormat(_swrDstRate, _outputChannels);
+	_silenceDetector.setStateChangedCallback([this](SilenceState state) {
+		if (_silenceCallback) {
+			_silenceCallback(state == SilenceState::Silent);
+		}
+	});
+	_silenceSkipEnabled = AyuSettings::getInstance().skipSilence();
 
 	return true;
 }
@@ -459,7 +483,7 @@ bool AbstractAudioFFMpegLoader::ensureResampleSpaceAvailable(int samples) {
 }
 
 bool AbstractAudioFFMpegLoader::changeSpeedFilter(float64 speed) {
-	speed = std::clamp(speed, kSpeedMin, kSpeedMax);
+	speed = std::clamp(speed, kSpeedMin, kSilenceSpeedMax);
 	if (EqualSpeeds(_filterSpeed, speed)) {
 		return false;
 	}
@@ -640,6 +664,20 @@ auto AbstractAudioFFMpegLoader::readOrBufferForFilter(
 	const auto guard = gsl::finally([&] {
 		frame->nb_samples = was;
 	});
+
+	if (_silenceSkipEnabled && frame->extended_data && frame->extended_data[0]) {
+		const auto channels = _outputChannels > 0 ? _outputChannels : 1;
+		const auto totalSamples = static_cast<int>(frame->nb_samples * channels);
+		if (_swrDstSampleFormat == AV_SAMPLE_FMT_S16) {
+			_silenceDetector.feed(
+				reinterpret_cast<const int16_t*>(frame->extended_data[0]),
+				totalSamples);
+		} else if (_swrDstSampleFormat == AV_SAMPLE_FMT_U8) {
+			_silenceDetector.feedU8(
+				reinterpret_cast<const uint8_t*>(frame->extended_data[0]),
+				totalSamples);
+		}
+	}
 
 	if (!_filterGraph) {
 		return bytes::const_span(

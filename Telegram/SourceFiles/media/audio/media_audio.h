@@ -68,6 +68,14 @@ class Loaders;
 
 [[nodiscard]] rpl::producer<AudioMsgId> Updated();
 
+struct SilenceUpdate {
+	AudioMsgId audioId;
+	bool isSilent = false;
+};
+
+[[nodiscard]] rpl::producer<SilenceUpdate> SilenceChanged();
+void NotifySilenceChanged(const AudioMsgId &audioId, bool isSilent);
+
 float64 ComputeVolume(AudioMsgId::Type type);
 
 enum class State {

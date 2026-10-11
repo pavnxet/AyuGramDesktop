@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "styles/style_media_player.h"
 #include "styles/style_widgets.h"
+#include "ayu/ayu_settings.h"
 
 namespace Media::Player {
 namespace {
@@ -278,6 +279,42 @@ void FillSpeedMenu(
 			raw->setIcon(overriden, overriden);
 			raw->action()->setEnabled(!chosen);
 			check->setVisible(chosen);
+		}, raw->lifetime());
+		menu->addAction(std::move(action));
+	}
+
+	menu->addSeparator(&st.dropdown.menu.separator);
+
+	{
+		const auto toggleSkipSilence = [=] {
+			auto &settings = AyuSettings::getInstance();
+			settings.setSkipSilence(!settings.skipSilence());
+		};
+		auto action = base::make_unique_q<Ui::Menu::Action>(
+			menu,
+			st.dropdown.menu,
+			Ui::Menu::CreateAction(menu, u"Skip Silence"_q, toggleSkipSilence),
+			nullptr,
+			nullptr);
+		const auto raw = action.get();
+		const auto check = Ui::CreateChild<Ui::RpWidget>(raw);
+		check->resize(st.activeCheck.size());
+		check->paintRequest(
+		) | rpl::on_next([check, icon = &st.activeCheck] {
+			auto p = QPainter(check);
+			icon->paint(p, 0, 0, check->width());
+		}, check->lifetime());
+		raw->sizeValue(
+		) | rpl::on_next([=, skip = st.activeCheckSkip](QSize size) {
+			check->moveToRight(
+				skip,
+				(size.height() - check->height()) / 2,
+				size.width());
+		}, check->lifetime());
+		check->setAttribute(Qt::WA_TransparentForMouseEvents);
+		AyuSettings::getInstance().skipSilenceValue(
+		) | rpl::on_next([=](bool enabled) {
+			check->setVisible(enabled);
 		}, raw->lifetime());
 		menu->addAction(std::move(action));
 	}

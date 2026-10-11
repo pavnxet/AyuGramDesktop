@@ -43,6 +43,12 @@ inline constexpr auto kSpeedMin = 0.5;
 inline constexpr auto kSpeedMax = 2.5;
 inline constexpr auto kSpedUpDefault = 1.7;
 
+// AyuGram: Skip Silence feature constants.
+// The silence speed can exceed kSpeedMax since it's not user-controlled
+// via the slider — it's automatically applied during detected silence.
+inline constexpr auto kSilenceSpeedMax = 6.0;
+inline constexpr auto kSilenceSpeedDefault = 4.0;
+
 [[nodiscard]] inline bool ValidFrameSize(int w, int h, int maxArea) {
 	return (w > 0)
 		&& (h > 0)

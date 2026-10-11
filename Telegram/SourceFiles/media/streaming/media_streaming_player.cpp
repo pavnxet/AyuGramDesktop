@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/audio/media_audio.h" // for SupportsSpeedControl()
 #include "media/media_common.h"
 #include "data/data_document.h" // for DocumentData::duration()
+#include "ayu/ayu_settings.h"
 
 namespace Media {
 namespace Streaming {
@@ -531,7 +532,7 @@ void Player::fail(Error error) {
 }
 
 void Player::play(const PlaybackOptions &options) {
-	Expects(options.speed >= kSpeedMin && options.speed <= kSpeedMax);
+	Expects(options.speed >= kSpeedMin && options.speed <= kSilenceSpeedMax);
 
 	// Looping video with audio is not supported for now.
 	Expects(!options.loop || (options.mode != Mode::Both));
@@ -543,8 +544,11 @@ void Player::play(const PlaybackOptions &options) {
 
 	savePreviousReceivedTill(options, previous);
 	_options = options;
+	_userSpeed = _options.speed;
+	_silenceActive = false;
 	if (!Media::Audio::SupportsSpeedControl()) {
 		_options.speed = 1.;
+		_userSpeed = 1.;
 	}
 	if (!_options.seekable) {
 		_options.position = 0;
@@ -744,6 +748,13 @@ void Player::start() {
 				_updates.fire({ Finished() });
 			}
 		}, _sessionLifetime);
+
+		Media::Player::SilenceChanged(
+		) | rpl::on_next([=](const Media::Player::SilenceUpdate &update) {
+			if (update.audioId == _audioId) {
+				handleSilenceStateChanged(update.isSilent);
+			}
+		}, _sessionLifetime);
 	}
 
 	if (guard && _video) {
@@ -839,23 +850,39 @@ bool Player::finished() const {
 }
 
 float64 Player::speed() const {
-	return _options.speed;
+	return _userSpeed;
 }
 
 void Player::setSpeed(float64 speed) {
-	Expects(speed >= kSpeedMin && speed <= kSpeedMax);
+	Expects(speed >= kSpeedMin && speed <= kSilenceSpeedMax);
 
 	if (!Media::Audio::SupportsSpeedControl()) {
 		speed = 1.;
 	}
-	if (!EqualSpeeds(_options.speed, speed)) {
-		_options.speed = speed;
+	_userSpeed = speed;
+	applyEffectiveSpeed();
+}
+
+void Player::handleSilenceStateChanged(bool isSilent) {
+	if (_silenceActive == isSilent) {
+		return;
+	}
+	_silenceActive = isSilent;
+	applyEffectiveSpeed();
+}
+
+void Player::applyEffectiveSpeed() {
+	const auto effectiveSpeed = (_silenceActive && AyuSettings::getInstance().skipSilence())
+		? kSilenceSpeedDefault
+		: _userSpeed;
+	if (!EqualSpeeds(_options.speed, effectiveSpeed)) {
+		_options.speed = effectiveSpeed;
 		if (active()) {
 			if (_audio) {
-				_audio->setSpeed(speed);
+				_audio->setSpeed(effectiveSpeed);
 			}
 			if (_video) {
-				_video->setSpeed(speed);
+				_video->setSpeed(effectiveSpeed);
 			}
 		}
 	}

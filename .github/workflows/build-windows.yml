@@ -1,0 +1,72 @@
+name: Build AyuGram Windows Portable
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/skip-silence
+
+jobs:
+  build:
+    name: Build Windows x64
+    runs-on: windows-2022
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: TBuild/tdesktop
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Prepare directories
+        shell: cmd
+        run: |
+          mkdir D:\TBuild\Libraries
+          mkdir D:\TBuild\ThirdParty
+          mklink /d %GITHUB_WORKSPACE%\TBuild\Libraries D:\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild\ThirdParty D:\TBuild\ThirdParty
+
+      - name: Prepare Libraries
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd %GITHUB_WORKSPACE%\TBuild\tdesktop\Telegram\build\prepare
+          python prepare.py silent
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd %GITHUB_WORKSPACE%\TBuild\tdesktop\Telegram
+          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D CMAKE_CONFIGURATION_TYPES=Release
+
+      - name: Build Telegram
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd %GITHUB_WORKSPACE%\TBuild\tdesktop
+          cmake --build out --config Release --target Telegram --parallel
+
+      - name: Package Portable Executable
+        shell: pwsh
+        run: |
+          $outDir = "${{ github.workspace }}/TBuild/tdesktop/out/Release"
+          $distDir = "${{ github.workspace }}/AyuGram_Portable"
+          New-Item -ItemType Directory -Force -Path $distDir
+          if (Test-Path "$outDir/Telegram.exe") {
+            Copy-Item "$outDir/Telegram.exe" "$distDir/AyuGram.exe"
+          } elseif (Test-Path "$outDir/AyuGram.exe") {
+            Copy-Item "$outDir/AyuGram.exe" "$distDir/AyuGram.exe"
+          }
+          Compress-Archive -Path "$distDir/*" -DestinationPath "${{ github.workspace }}/AyuGram_Windows_Portable.zip"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-Windows-x64-SkipSilence
+          path: AyuGram_Windows_Portable.zip
+          retention-days: 14

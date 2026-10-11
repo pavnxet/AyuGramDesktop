@@ -60,6 +60,14 @@ public:
 		return false;
 	}
 
+	virtual void setSilenceSkipEnabled(bool enabled) {
+	}
+	[[nodiscard]] virtual bool isSilenceSkipActive() const {
+		return false;
+	}
+	virtual void setSilenceCallback(Fn<void(bool isSilent)> callback) {
+	}
+
 	void saveDecodedSamples(not_null<QByteArray*> samples);
 	void takeSavedDecodedSamples(not_null<QByteArray*> samples);
 	bool holdsSavedDecodedSamples() const;

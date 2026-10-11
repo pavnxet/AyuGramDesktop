@@ -1631,6 +1631,8 @@ PRIVATE
     media/audio/media_audio_capture_common.h
     media/audio/media_audio_ffmpeg_loader.cpp
     media/audio/media_audio_ffmpeg_loader.h
+    media/audio/media_audio_silence_detector.cpp
+    media/audio/media_audio_silence_detector.h
     media/audio/media_audio_loader.cpp
     media/audio/media_audio_loader.h
     media/audio/media_audio_loaders.cpp

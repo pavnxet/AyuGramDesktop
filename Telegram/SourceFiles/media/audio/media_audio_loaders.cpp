@@ -424,6 +424,11 @@ Loaders::SetupLoaderResult Loaders::setupLoader(
 				bytes::vector());
 		}
 		l = loader->get();
+		l->setSilenceCallback([id = audio](bool isSilent) {
+			crl::on_main([id, isSilent] {
+				Media::Player::NotifySilenceChanged(id, isSilent);
+			});
+		});
 
 		track->speed = track->nextSpeed;
 		if (!l->open(positionMs, track->speed)) {

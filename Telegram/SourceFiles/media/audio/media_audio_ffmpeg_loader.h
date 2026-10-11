@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "media/audio/media_audio.h"
 #include "media/audio/media_audio_loader.h"
+#include "media/audio/media_audio_silence_detector.h"
 #include "media/streaming/media_streaming_utility.h"
 
 extern "C" {
@@ -103,6 +104,10 @@ public:
 		return _outputFormat;
 	}
 
+	void setSilenceSkipEnabled(bool enabled) override;
+	[[nodiscard]] bool isSilenceSkipActive() const override;
+	void setSilenceCallback(Fn<void(bool isSilent)> callback) override;
+
 	~AbstractAudioFFMpegLoader();
 
 protected:
@@ -168,6 +173,10 @@ private:
 	AVFilterContext *_filterSrc = nullptr;
 	AVFilterContext *_atempo = nullptr;
 	AVFilterContext *_filterSink = nullptr;
+
+	SilenceDetector _silenceDetector;
+	bool _silenceSkipEnabled = false;
+	Fn<void(bool isSilent)> _silenceCallback;
 
 };
 
