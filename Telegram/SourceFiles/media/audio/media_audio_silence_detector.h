@@ -10,16 +10,19 @@ AyuGram Skip Silence Feature
 #include <cmath>
 #include <functional>
 
+struct AVFrame;
+
 namespace Media {
 
 // Configuration for the silence detection engine.
 struct SilenceSkipConfig {
 	// Silence threshold in dBFS. Audio below this level is considered silent.
-	float thresholdDb = -35.0f;
+	// -30 dBFS is the gold standard for speech in presence of room/mic noise.
+	float thresholdDb = -30.0f;
 	// Minimum silence duration in milliseconds before speed-up activates.
-	int minSilenceDurationMs = 250;
+	int minSilenceDurationMs = 200;
 	// Playback speed multiplier during detected silence.
-	float silenceSpeed = 4.0f;
+	float silenceSpeed = 3.0f;
 	// Padding in milliseconds to preserve before/after speech boundaries.
 	int paddingMs = 30;
 };
@@ -42,6 +45,10 @@ enum class SilenceState {
 class SilenceDetector {
 public:
 	explicit SilenceDetector(int sampleRate = 48000, int channels = 2);
+
+	// Feed any decoded FFmpeg AVFrame (supports FLTP, FLT, S16, S16P, U8, S32).
+	// Returns the current silence state after processing.
+	SilenceState feedFrame(const AVFrame *frame);
 
 	// Feed decoded PCM samples (16-bit signed integers, interleaved).
 	// Returns the current silence state after processing.
@@ -75,6 +82,9 @@ public:
 	}
 
 private:
+	// Compute RMS of any decoded FFmpeg AVFrame.
+	[[nodiscard]] float computeRmsFrame(const AVFrame *frame) const;
+
 	// Compute RMS of 16-bit PCM samples (normalized to 0.0–1.0 range).
 	[[nodiscard]] float computeRmsS16(
 		const int16_t *samples,

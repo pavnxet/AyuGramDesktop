@@ -6,6 +6,11 @@ AyuGram Skip Silence Feature
 */
 #include "media/audio/media_audio_silence_detector.h"
 
+extern "C" {
+#include <libavutil/frame.h>
+#include <libavutil/samplefmt.h>
+}
+
 #include <algorithm>
 #include <cstring>
 
@@ -100,6 +105,167 @@ void SilenceDetector::transitionTo(SilenceState newState) {
 			_stateChangedCallback(newState);
 		}
 	}
+}
+
+float SilenceDetector::computeRmsFrame(const AVFrame *frame) const {
+	if (!frame || frame->nb_samples <= 0) {
+		return 0.0f;
+	}
+	const auto format = static_cast<AVSampleFormat>(frame->format);
+	const auto channels = std::max(1, frame->ch_layout.nb_channels ? frame->ch_layout.nb_channels : _channels);
+	const auto nb_samples = frame->nb_samples;
+	const bool isPlanar = (format == AV_SAMPLE_FMT_FLTP
+		|| format == AV_SAMPLE_FMT_S16P
+		|| format == AV_SAMPLE_FMT_U8P
+		|| format == AV_SAMPLE_FMT_S32P
+		|| format == AV_SAMPLE_FMT_DBLP);
+
+	double sumSquares = 0.0;
+	int64_t totalCount = 0;
+
+	if (format == AV_SAMPLE_FMT_FLTP || format == AV_SAMPLE_FMT_FLT) {
+		if (isPlanar) {
+			for (int c = 0; c < channels; ++c) {
+				const auto ptr = reinterpret_cast<const float*>(frame->extended_data[c]);
+				if (!ptr) continue;
+				for (int i = 0; i < nb_samples; ++i) {
+					const double val = ptr[i];
+					sumSquares += val * val;
+				}
+				totalCount += nb_samples;
+			}
+		} else {
+			const auto ptr = reinterpret_cast<const float*>(frame->extended_data[0]);
+			if (ptr) {
+				const int total = nb_samples * channels;
+				for (int i = 0; i < total; ++i) {
+					const double val = ptr[i];
+					sumSquares += val * val;
+				}
+				totalCount += total;
+			}
+		}
+	} else if (format == AV_SAMPLE_FMT_S16 || format == AV_SAMPLE_FMT_S16P) {
+		if (isPlanar) {
+			for (int c = 0; c < channels; ++c) {
+				const auto ptr = reinterpret_cast<const int16_t*>(frame->extended_data[c]);
+				if (!ptr) continue;
+				for (int i = 0; i < nb_samples; ++i) {
+					const double val = ptr[i] / 32768.0;
+					sumSquares += val * val;
+				}
+				totalCount += nb_samples;
+			}
+		} else {
+			const auto ptr = reinterpret_cast<const int16_t*>(frame->extended_data[0]);
+			if (ptr) {
+				const int total = nb_samples * channels;
+				for (int i = 0; i < total; ++i) {
+					const double val = ptr[i] / 32768.0;
+					sumSquares += val * val;
+				}
+				totalCount += total;
+			}
+		}
+	} else if (format == AV_SAMPLE_FMT_U8 || format == AV_SAMPLE_FMT_U8P) {
+		if (isPlanar) {
+			for (int c = 0; c < channels; ++c) {
+				const auto ptr = reinterpret_cast<const uint8_t*>(frame->extended_data[c]);
+				if (!ptr) continue;
+				for (int i = 0; i < nb_samples; ++i) {
+					const double val = (ptr[i] - 128.0) / 128.0;
+					sumSquares += val * val;
+				}
+				totalCount += nb_samples;
+			}
+		} else {
+			const auto ptr = reinterpret_cast<const uint8_t*>(frame->extended_data[0]);
+			if (ptr) {
+				const int total = nb_samples * channels;
+				for (int i = 0; i < total; ++i) {
+					const double val = (ptr[i] - 128.0) / 128.0;
+					sumSquares += val * val;
+				}
+				totalCount += total;
+			}
+		}
+	} else if (format == AV_SAMPLE_FMT_S32 || format == AV_SAMPLE_FMT_S32P) {
+		if (isPlanar) {
+			for (int c = 0; c < channels; ++c) {
+				const auto ptr = reinterpret_cast<const int32_t*>(frame->extended_data[c]);
+				if (!ptr) continue;
+				for (int i = 0; i < nb_samples; ++i) {
+					const double val = ptr[i] / 2147483648.0;
+					sumSquares += val * val;
+				}
+				totalCount += nb_samples;
+			}
+		} else {
+			const auto ptr = reinterpret_cast<const int32_t*>(frame->extended_data[0]);
+			if (ptr) {
+				const int total = nb_samples * channels;
+				for (int i = 0; i < total; ++i) {
+					const double val = ptr[i] / 2147483648.0;
+					sumSquares += val * val;
+				}
+				totalCount += total;
+			}
+		}
+	}
+
+	if (totalCount <= 0) {
+		return 0.0f;
+	}
+	return static_cast<float>(std::sqrt(sumSquares / totalCount));
+}
+
+SilenceState SilenceDetector::feedFrame(const AVFrame *frame) {
+	if (!frame || frame->nb_samples <= 0) {
+		return _state;
+	}
+	const auto rms = computeRmsFrame(frame);
+	const auto db = rmsToDbfs(rms);
+	const auto belowThreshold = (db < _config.thresholdDb);
+
+	const auto frameCount = frame->nb_samples;
+
+	switch (_state) {
+	case SilenceState::Noisy:
+		if (belowThreshold) {
+			_consecutiveSilentSamples += frameCount;
+			if (_consecutiveSilentSamples >= _minSilenceSamples) {
+				transitionTo(SilenceState::Silent);
+			} else {
+				transitionTo(SilenceState::MaybeSilent);
+			}
+		} else {
+			_consecutiveSilentSamples = 0;
+		}
+		_hangoverRemaining = _paddingSamples;
+		break;
+
+	case SilenceState::MaybeSilent:
+		if (belowThreshold) {
+			_consecutiveSilentSamples += frameCount;
+			if (_consecutiveSilentSamples >= _minSilenceSamples) {
+				transitionTo(SilenceState::Silent);
+			}
+		} else {
+			_consecutiveSilentSamples = 0;
+			transitionTo(SilenceState::Noisy);
+		}
+		break;
+
+	case SilenceState::Silent:
+		if (!belowThreshold) {
+			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
+			transitionTo(SilenceState::Noisy);
+		}
+		break;
+	}
+
+	return _state;
 }
 
 SilenceState SilenceDetector::feed(

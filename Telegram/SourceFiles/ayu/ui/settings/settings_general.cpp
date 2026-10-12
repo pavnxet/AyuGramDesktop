@@ -206,6 +206,13 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setDisableNotificationsDelay,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/skipSilence"_q,
+		.title = rpl::single(QString("Skip Silence in Videos & Audio")),
+		.getter = &AyuSettings::skipSilence,
+		.setter = &AyuSettings::setSkipSilence,
+	});
+
 	ayu.addSectionDivider();
 
 	const auto zalgoButton = builder.addButton({

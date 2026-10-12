@@ -47,7 +47,7 @@ inline constexpr auto kSpedUpDefault = 1.7;
 // The silence speed can exceed kSpeedMax since it's not user-controlled
 // via the slider — it's automatically applied during detected silence.
 inline constexpr auto kSilenceSpeedMax = 6.0;
-inline constexpr auto kSilenceSpeedDefault = 4.0;
+inline constexpr auto kSilenceSpeedDefault = 3.0;
 
 [[nodiscard]] inline bool ValidFrameSize(int w, int h, int maxArea) {
 	return (w > 0)

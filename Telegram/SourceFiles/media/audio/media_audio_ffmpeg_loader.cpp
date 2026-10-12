@@ -665,18 +665,8 @@ auto AbstractAudioFFMpegLoader::readOrBufferForFilter(
 		frame->nb_samples = was;
 	});
 
-	if (_silenceSkipEnabled && frame->extended_data && frame->extended_data[0]) {
-		const auto channels = _outputChannels > 0 ? _outputChannels : 1;
-		const auto totalSamples = static_cast<int>(frame->nb_samples * channels);
-		if (_swrDstSampleFormat == AV_SAMPLE_FMT_S16) {
-			_silenceDetector.feed(
-				reinterpret_cast<const int16_t*>(frame->extended_data[0]),
-				totalSamples);
-		} else if (_swrDstSampleFormat == AV_SAMPLE_FMT_U8) {
-			_silenceDetector.feedU8(
-				reinterpret_cast<const uint8_t*>(frame->extended_data[0]),
-				totalSamples);
-		}
+	if (AyuSettings::getInstance().skipSilence() && frame->extended_data && frame->extended_data[0]) {
+		_silenceDetector.feedFrame(frame);
 	}
 
 	if (!_filterGraph) {

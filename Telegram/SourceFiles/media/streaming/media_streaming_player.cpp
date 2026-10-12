@@ -751,9 +751,14 @@ void Player::start() {
 
 		Media::Player::SilenceChanged(
 		) | rpl::on_next([=](const Media::Player::SilenceUpdate &update) {
-			if (update.audioId == _audioId) {
+			if (update.audioId == _audioId || update.audioId.type() == _audioId.type()) {
 				handleSilenceStateChanged(update.isSilent);
 			}
+		}, _sessionLifetime);
+
+		AyuSettings::getInstance().skipSilenceChanges(
+		) | rpl::on_next([=](bool) {
+			applyEffectiveSpeed();
 		}, _sessionLifetime);
 	}
 

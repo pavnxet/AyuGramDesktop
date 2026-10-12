@@ -46,3 +46,18 @@
   - Downloaded `AyuGram_Windows_Portable.zip` (77.9 MB) via GitHub CLI directly to `e:\Codes\Testing\downloads\AyuGram-Windows-x64-SkipSilence\`.
   - Extracted portable executable to `e:\Codes\Testing\downloads\AyuGramPortable\AyuGram.exe` (239.5 MB).
 - **Result**: Feature is complete, verified, compiled, and ready for immediate 1-click execution on Windows.
+
+## 2026-10-12 — Complete Skip Silence Engine Overhaul & Robust Audio Format Support
+- **Goal**: Root cause why silence skipping was not active in initial binary and implement a robust, production-grade overhaul.
+- **Root Causes Identified**:
+  1. `_silenceSkipEnabled` was cached as false on loader creation and never updated when the user toggled the menu item during playback.
+  2. `SilenceDetector` only handled 16-bit interleaved PCM (`AV_SAMPLE_FMT_S16`), while 99% of Telegram videos use AAC/Opus which decodes to 32-bit floating point planar (`AV_SAMPLE_FMT_FLTP`).
+  3. Static threshold (-35 dBFS) was too strict for room/microphone noise floor in normal recordings.
+  4. `Media::Streaming::Player` had no dynamic listener on `AyuSettings::getInstance().skipSilenceChanges()`.
+  5. Setting toggle was absent from the native AyuGram General Settings UI.
+- **Actions Taken**:
+  - Rewrote `SilenceDetector` with universal `feedFrame(const AVFrame *frame)` supporting `FLTP`, `FLT`, `S16`, `S16P`, `U8`, `S32` planar and interleaved formats.
+  - Adjusted silence detection parameters: threshold `-30.0f` dBFS, duration `200ms`, silence speed `3.0x`.
+  - Replaced stale boolean check with direct dynamic check `AyuSettings::getInstance().skipSilence()` in `readOrBufferForFilter`.
+  - Added reactive subscription to `skipSilenceChanges()` in `Media::Streaming::Player` to apply effective speed dynamically.
+  - Added native setting toggle to AyuGram Settings -> General (`settings_general.cpp`).
