@@ -232,16 +232,20 @@ SilenceState SilenceDetector::feedFrame(const AVFrame *frame) {
 	switch (_state) {
 	case SilenceState::Noisy:
 		if (belowThreshold) {
-			_consecutiveSilentSamples += frameCount;
-			if (_consecutiveSilentSamples >= _minSilenceSamples) {
-				transitionTo(SilenceState::Silent);
+			if (_hangoverRemaining > 0) {
+				_hangoverRemaining = std::max(int64_t(0), _hangoverRemaining - frameCount);
 			} else {
-				transitionTo(SilenceState::MaybeSilent);
+				_consecutiveSilentSamples += frameCount;
+				if (_consecutiveSilentSamples >= _minSilenceSamples) {
+					transitionTo(SilenceState::Silent);
+				} else {
+					transitionTo(SilenceState::MaybeSilent);
+				}
 			}
 		} else {
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 		}
-		_hangoverRemaining = _paddingSamples;
 		break;
 
 	case SilenceState::MaybeSilent:
@@ -252,6 +256,7 @@ SilenceState SilenceDetector::feedFrame(const AVFrame *frame) {
 			}
 		} else {
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 			transitionTo(SilenceState::Noisy);
 		}
 		break;
@@ -283,17 +288,20 @@ SilenceState SilenceDetector::feed(
 	switch (_state) {
 	case SilenceState::Noisy:
 		if (belowThreshold) {
-			_consecutiveSilentSamples += frameCount;
-			if (_consecutiveSilentSamples >= _minSilenceSamples) {
-				transitionTo(SilenceState::Silent);
+			if (_hangoverRemaining > 0) {
+				_hangoverRemaining = std::max(int64_t(0), _hangoverRemaining - frameCount);
 			} else {
-				transitionTo(SilenceState::MaybeSilent);
+				_consecutiveSilentSamples += frameCount;
+				if (_consecutiveSilentSamples >= _minSilenceSamples) {
+					transitionTo(SilenceState::Silent);
+				} else {
+					transitionTo(SilenceState::MaybeSilent);
+				}
 			}
 		} else {
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 		}
-		// Reset hangover counter while noisy.
-		_hangoverRemaining = _paddingSamples;
 		break;
 
 	case SilenceState::MaybeSilent:
@@ -305,6 +313,7 @@ SilenceState SilenceDetector::feed(
 		} else {
 			// False alarm — speech resumed before minimum duration.
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 			transitionTo(SilenceState::Noisy);
 		}
 		break;
@@ -336,16 +345,20 @@ SilenceState SilenceDetector::feedU8(
 	switch (_state) {
 	case SilenceState::Noisy:
 		if (belowThreshold) {
-			_consecutiveSilentSamples += frameCount;
-			if (_consecutiveSilentSamples >= _minSilenceSamples) {
-				transitionTo(SilenceState::Silent);
+			if (_hangoverRemaining > 0) {
+				_hangoverRemaining = std::max(int64_t(0), _hangoverRemaining - frameCount);
 			} else {
-				transitionTo(SilenceState::MaybeSilent);
+				_consecutiveSilentSamples += frameCount;
+				if (_consecutiveSilentSamples >= _minSilenceSamples) {
+					transitionTo(SilenceState::Silent);
+				} else {
+					transitionTo(SilenceState::MaybeSilent);
+				}
 			}
 		} else {
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 		}
-		_hangoverRemaining = _paddingSamples;
 		break;
 
 	case SilenceState::MaybeSilent:
@@ -356,6 +369,7 @@ SilenceState SilenceDetector::feedU8(
 			}
 		} else {
 			_consecutiveSilentSamples = 0;
+			_hangoverRemaining = _paddingSamples;
 			transitionTo(SilenceState::Noisy);
 		}
 		break;

@@ -878,7 +878,7 @@ void Player::handleSilenceStateChanged(bool isSilent) {
 
 void Player::applyEffectiveSpeed() {
 	const auto effectiveSpeed = (_silenceActive && AyuSettings::getInstance().skipSilence())
-		? kSilenceSpeedDefault
+		? std::max(_userSpeed, kSilenceSpeedDefault)
 		: _userSpeed;
 	if (!EqualSpeeds(_options.speed, effectiveSpeed)) {
 		_options.speed = effectiveSpeed;

@@ -44,12 +44,18 @@ Media::Player::SilenceChanged() event stream fires
 Media::Streaming::Player::handleSilenceStateChanged(isSilent)
     ↓
 Player::applyEffectiveSpeed():
-    - If silence active && skipSilence: speeds up to kSilenceSpeedDefault (4.0×)
+    - If silence active && skipSilence: speeds up to std::max(_userSpeed, kSilenceSpeedDefault) (2.5×)
     - If speech resumes: instantly restores user's base speed (_userSpeed)
     - Applies to BOTH _audio->setSpeed() and _video->setSpeed() synchronously
 ```
 
 ## Recent Changes
+- 2026-10-13: Aligned Skip Silence with NewPipe / ExoPlayer Media3 parameters & fixed hangover padding
+  - Modified: `media_common.h` (`kSilenceSpeedDefault = 2.5`)
+  - Modified: `media/audio/media_audio_silence_detector.h` (`minSilenceDurationMs = 100`, `silenceSpeed = 2.5`, `paddingMs = 20`)
+  - Modified: `media/audio/media_audio_silence_detector.cpp` (Fixed hangover decrement logic in `feedFrame`, `feed`, `feedU8` to enforce 20ms boundary padding)
+  - Modified: `media/streaming/media_streaming_player.cpp` (Used `std::max(_userSpeed, kSilenceSpeedDefault)`)
+  - Modified: `media/audio/media_audio_ffmpeg_loader.cpp` (Reset silence detector on `startReadingQueuedFrames`)
 - 2026-10-11: Implemented Skip Silence feature
   - New: `media_audio_silence_detector.h/.cpp` (SilenceDetector class, RMS sliding window, 3-state FSM)
   - Modified: `media_common.h` (`kSilenceSpeedMax = 6.0`, `kSilenceSpeedDefault = 4.0`)

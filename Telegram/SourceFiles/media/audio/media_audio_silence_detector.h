@@ -17,14 +17,17 @@ namespace Media {
 // Configuration for the silence detection engine.
 struct SilenceSkipConfig {
 	// Silence threshold in dBFS. Audio below this level is considered silent.
-	// -30 dBFS is the gold standard for speech in presence of room/mic noise.
+	// -30 dBFS is the gold standard for speech in presence of room/mic noise
+	// (matching ExoPlayer DEFAULT_SILENCE_THRESHOLD_LEVEL = 1024 / 32768 ≈ -30.1 dBFS).
 	float thresholdDb = -30.0f;
 	// Minimum silence duration in milliseconds before speed-up activates.
-	int minSilenceDurationMs = 200;
+	// 100ms matches NewPipe / ExoPlayer DEFAULT_MINIMUM_SILENCE_DURATION_US.
+	int minSilenceDurationMs = 100;
 	// Playback speed multiplier during detected silence.
-	float silenceSpeed = 3.0f;
-	// Padding in milliseconds to preserve before/after speech boundaries.
-	int paddingMs = 30;
+	float silenceSpeed = 2.5f;
+	// Padding in milliseconds to preserve before/after speech boundaries
+	// (matching NewPipe / ExoPlayer DEFAULT_PADDING_SILENCE_US = 20ms).
+	int paddingMs = 20;
 };
 
 // The three states of the silence detection FSM.

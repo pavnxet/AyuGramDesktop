@@ -225,6 +225,7 @@ void AbstractAudioFFMpegLoader::dropFramesTill(int64 samples) {
 
 int64 AbstractAudioFFMpegLoader::startReadingQueuedFrames(float64 newSpeed) {
 	changeSpeedFilter(newSpeed);
+	_silenceDetector.reset();
 	if (_framesQueued.empty()) {
 		_framesQueuedIndex = -1;
 		return -1;

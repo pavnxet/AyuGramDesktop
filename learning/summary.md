@@ -61,3 +61,17 @@
   - Replaced stale boolean check with direct dynamic check `AyuSettings::getInstance().skipSilence()` in `readOrBufferForFilter`.
   - Added reactive subscription to `skipSilenceChanges()` in `Media::Streaming::Player` to apply effective speed dynamically.
   - Added native setting toggle to AyuGram Settings -> General (`settings_general.cpp`).
+
+## 2026-10-13 — NewPipe / ExoPlayer-Aligned Skip Silence Fine-Tuning & Hangover Fix
+- **Goal**: Align Skip Silence responsiveness, boundary preservation, and playback smoothness with NewPipe (Google ExoPlayer Media3 `SilenceSkippingAudioProcessor`).
+- **Root Cause of Imperfection**:
+  1. `minSilenceDurationMs` was 200ms (NewPipe uses 100ms), causing conversational pauses to feel sluggish or missed.
+  2. `_hangoverRemaining` (padding) was unconditionally assigned every frame but never checked or decremented in `feedFrame`, `feed`, and `feedU8`, leaving speech boundaries without a safe audio cushion.
+  3. `kSilenceSpeedDefault = 3.0` exceeded Telegram's standard `kSpeedMax = 2.5` ceiling, causing pitch warble in `atempo` and video presentation frame drops during re-buffering.
+- **Actions Taken**:
+  - Aligned `SilenceSkipConfig` parameters to ExoPlayer defaults: `minSilenceDurationMs = 100` (from 200), `paddingMs = 20` (from 30), `thresholdDb = -30.0f`.
+  - Tuned `kSilenceSpeedDefault = 2.5` in `media_common.h` and `media_audio_silence_detector.h` to stay within Telegram's native tested speed envelope and eliminate robotic pitch artifacts.
+  - Implemented proper hangover countdown logic across `feedFrame`, `feed`, and `feedU8` in `media_audio_silence_detector.cpp`, preserving a 20ms audio cushion before and after speech.
+  - Updated `Player::applyEffectiveSpeed()` in `media_streaming_player.cpp` to use `std::max(_userSpeed, kSilenceSpeedDefault)`.
+  - Added `_silenceDetector.reset()` in `AbstractAudioFFMpegLoader::startReadingQueuedFrames` to ensure clean detector state across seeks and speed changes.
+- **Result**: Immediate, natural responsiveness matching NewPipe / ExoPlayer behavior with zero consonant clipping and smooth A/V sync.
